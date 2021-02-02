@@ -1,0 +1,128 @@
+---
+title: "Scraping"
+author: "Amy"
+date: "01/02/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+install.packages("rvest")
+library(rvest)
+library(tidyverse)
+library(lubridate)
+```
+
+Data scraped the wikipedia page entitled "List of stories set in a future now past", found at https://en.wikipedia.org/wiki/List_of_stories_set_in_a_future_now_past :
+
+```{r}
+raw_data <- read_html("https://en.wikipedia.org/wiki/List_of_stories_set_in_a_future_now_past")
+write_html(raw_data, "inputs/raw_data.html") # Note that we save the file as a html file.
+```
+
+Parsing data, using content from https://www.tellingstorieswithdata.com/gather-data.html#case-study---canadian-prime-ministers :
+
+```{r}
+parse_data_inspection <- 
+  raw_data %>% 
+  html_nodes("tr") %>% 
+  html_nodes("td") %>% 
+  html_text()
+```
+
+Inspecting to see the data:
+
+```{r}
+parse_data_inspection[0:10]
+```
+
+```{r}
+parsed_data <- 
+  tibble(raw_text = parse_data_inspection)# Convert the character vector to a table
+
+# the original table is 5 columns wide, so I pulled every 5th column and bound them together in a tibble:
+parsed_data_t <- 
+  bind_cols(
+    parsed_data[seq(1,nrow(parsed_data), 5), ],
+    parsed_data[seq(2,nrow(parsed_data), 5), ],
+    parsed_data[seq(3,nrow(parsed_data), 5), ],
+    parsed_data[seq(4,nrow(parsed_data), 5), ],
+    parsed_data[seq(5,nrow(parsed_data), 5), ],
+    ) %>%
+  rename("Work" = raw_text...1,
+         "Form" = raw_text...2,
+         "Released" = raw_text...3,
+         "Set" = raw_text...4,
+         "Predictions" = raw_text...5
+           )
+
+# Cleaning up some of the extra \n characters:
+parsed_data_t <-
+  parsed_data_t %>%
+  mutate(Work = str_remove(Work, "\n"),
+         Form = str_remove(Form, "\n"),
+         Released = str_remove(Released, "\n"),
+         Set = str_remove(Set, "\n"),
+         Predictions = str_remove(Predictions, "\n")
+           )
+
+# Cleaning out wikipedia references, which are of the form [#]:
+parsed_data_t <-
+  parsed_data_t %>%
+  mutate(Work = str_remove(Work, "\\[.*\\]"), 
+         Form = str_remove(Form, "\\[.*\\]"), 
+         Released = str_remove(Released, "\\[.*\\]"), 
+         Set = str_remove(Set, "\\[.*\\]"), 
+         Predictions = str_remove(Predictions, "\\[.*\\]")
+           )
+
+# Replacing a few tricky dates, found but skimming the table, and removing all non-digits in the year columns:
+parsed_data_t <-
+  parsed_data_t %>%
+  mutate(Set = str_replace(Set, "The late 20th century", "1990"), 
+         Set = str_replace(Set, "Early in the 20th century", "1910"), 
+         Set = str_replace(Set, "End of the 20th century", "1999"),
+         Set = str_replace(Set, "Early 21st century", "2010"), 
+         Set = str_replace(Set, "199X", "1995"),
+         Set = str_replace(Set, "19XX", "1995"),
+         Set = str_replace(Set, "200X", "2005"),
+         Set = str_replace(Set, "The late 1990s", "1998"), 
+         Set = str_replace(Set, "20th century", "1950"), 
+         Set = str_remove_all(Set, "\\D"),
+         Released = str_remove_all(Released, "\\D"))
+
+# Extracting the first four digits from the year column. This means that if the column referenced a range, 
+# then only the first year is taken. Ex. 1920-1930 becomes 1920.
+parsed_data_t <-
+  parsed_data_t %>%
+  mutate(
+    Set = str_extract(Set, "\\d{4}"),
+    Released = str_extract(Released, "\\d{4}")
+  )
+
+# Making the years numeric for graphing properly.
+parsed_data_n <-
+  parsed_data_t %>%
+  mutate(Released = as.numeric(Released),
+         Set = as.numeric(Set))
+
+
+```
+
+```{r}
+# Checking the numer of different forms-next steps would be to group these further, as the graph has way too many color groups.
+forms <- parsed_data_n %>%
+  distinct(Form)
+```
+
+
+```{r, fig.width = 20, fig.height=10}
+parsed_data_n %>%
+  ggplot(aes(x = Released, y = Set, color = Form)) +
+  geom_point() +
+  labs(title = "Date of release compared to setting for 'stories set in a future now past'"
+       )
+```
+
+
+
