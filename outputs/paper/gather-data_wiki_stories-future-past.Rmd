@@ -7,17 +7,22 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-install.packages("rvest")
+
+```
+```{r}
+#install.packages("rvest")
 library(rvest)
 library(tidyverse)
 library(lubridate)
+library(here)
 ```
+
 
 Data scraped the wikipedia page entitled "List of stories set in a future now past", found at https://en.wikipedia.org/wiki/List_of_stories_set_in_a_future_now_past :
 
 ```{r}
 raw_data <- read_html("https://en.wikipedia.org/wiki/List_of_stories_set_in_a_future_now_past")
-write_html(raw_data, "inputs/raw_data.html") # Note that we save the file as a html file.
+write_html(raw_data, here::here("inputs/raw_data.html")) # Note that we save the file as a html file.
 ```
 
 Parsing data, using content from https://www.tellingstorieswithdata.com/gather-data.html#case-study---canadian-prime-ministers :
@@ -116,7 +121,7 @@ forms <- parsed_data_n %>%
 ```
 
 
-```{r, fig.width = 20, fig.height=10}
+```{r, fig.width = 15, fig.height=8}
 parsed_data_n %>%
   ggplot(aes(x = Released, y = Set, color = Form)) +
   geom_point() +
